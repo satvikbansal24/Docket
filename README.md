@@ -1,28 +1,25 @@
-# Docket — deploy in ~2 minutes (free, Netlify)
+# Docket — personal time & billing tracker
 
 ## What's in this folder
-- `index.html` — the whole app (timer, projects, report). PIN lock included.
+- `index.html` — the whole app (timer, projects, report).
 - `manifest.json` + `icon-192.png` / `icon-512.png` — makes it installable on your phone.
-- `service-worker.js` — lets it work offline once installed.
+- `service-worker.js` — lets it work offline once installed, and checks for updates on every launch.
+- `netlify/functions/ask-ai.js` + `package.json` — a small serverless function that powers the "Ask AI" button on the Projects tab. Requires Netlify to be connected to this GitHub repo (not the drag-and-drop deploy method) and an `ANTHROPIC_API_KEY` environment variable set on the Netlify site.
 
-Your data (projects, time entries) is stored in your phone's browser storage, not sent anywhere. Nobody but someone with the link *and* your PIN can see it.
+Your data (projects, time entries) is stored in your phone's browser storage, not sent anywhere. When you use "Ask AI" to draft a project, only the text you type into that box is sent to Anthropic's API — none of your existing projects or time entries.
 
-## Deploy (Netlify, no account needed to start)
-1. Go to **https://app.netlify.com/drop** in a browser.
-2. Drag this whole folder onto the page.
-3. Netlify gives you a live URL in a few seconds, like `random-name-123.netlify.app`.
-4. (Optional) Create a free Netlify account to keep the site permanently and rename the URL to something like `docket-satvik.netlify.app`. Without an account, "drop" sites can expire.
+## Deploy (Netlify, connected to GitHub)
+1. Go to **app.netlify.com**, sign in with GitHub.
+2. **Add new project → Import an existing project → GitHub** → pick this repo.
+3. Leave build settings at their defaults (no build command needed) → Deploy.
+4. To enable "Ask AI": in the site's **Project configuration → Environment variables**, add `ANTHROPIC_API_KEY` with a key from console.anthropic.com. Without this, everything else in the app works fine — the Ask AI button will just show an error if used.
+
+Every push to `main` on GitHub redeploys the site automatically.
 
 ## Install on your iPhone
-1. Open your new URL in **Safari** (must be Safari, not Chrome, for iOS install).
+1. Open your site's URL in **Safari** (must be Safari, not Chrome, for iOS install).
 2. Tap the **Share** icon → **Add to Home Screen**.
 3. It now sits on your home screen with its own icon and opens full-screen, no browser bar.
 
-## PDF reports
-The Report tab now offers both CSV and a designed PDF export (summary by project with color bars, plus a full day-by-day log). The PDF export loads a small library from the internet the first time you use it — after that it's cached and works offline too.
-
-## First launch
-You'll be asked to set a 4-digit PIN — this locks the app so the link alone isn't enough to see your data. You'll enter it each time you open Docket.
-
-## Updating later
-If you want to change anything (add a feature, adjust styling), just re-drag the updated folder onto the same Netlify site (or connect it to a GitHub repo for automatic updates) — your data stays put since it lives in the phone's browser storage, separate from the site files.
+## Reports
+The Report tab offers CSV export, a designed PDF export (loads a small library from the internet the first time, then works offline), and a Backup & restore section — download your data as a JSON file, or restore from one. Since your data only lives in this browser's storage, a periodic backup is the only copy that survives clearing site data or switching devices.

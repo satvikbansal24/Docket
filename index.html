@@ -62,7 +62,8 @@
   main{padding:20px;}
   .card{background:var(--paper-raised);border:1px solid var(--rule);border-radius:4px;padding:24px;}
   .field{margin-top:10px;}
-  .field label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px;}
+  .field > label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:4px;margin-bottom:5px;}
+  .field > label svg{width:11px;height:11px;flex-shrink:0;}
   .field input, .field select, .field textarea{width:100%;padding:10px 12px;border-radius:3px;border:1px solid var(--rule);font-size:14px;background:var(--input-bg);color:var(--ink);}
   .row{display:flex;gap:8px;}
   .btn-primary{background:var(--gold-dark);color:#fff;border:none;border-radius:3px;padding:9px 0;font-size:13px;font-weight:600;flex:1;
@@ -101,12 +102,21 @@
   .empty.bordered{border:1px dashed var(--rule-dark);border-radius:4px;padding:40px 20px;}
 
   /* Projects */
-  .proj-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .proj-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px;flex-wrap:wrap;}
   .proj-toolbar label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);}
+  .proj-toolbar-actions{display:flex;gap:8px;}
   .form-box{background:var(--gold-bg);border-radius:4px;padding:16px;margin-bottom:16px;}
-  .form-box .form-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-  .form-box .form-head .title{font-size:13px;font-weight:600;}
+  .form-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .form-head .title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:5px;}
+  .form-head .title svg{width:14px;height:14px;flex-shrink:0;}
   .form-box textarea{resize:vertical;}
+  .ai-box{background:var(--gold-bg);border-radius:4px;padding:16px;margin-bottom:16px;}
+  .ai-box textarea{resize:vertical;}
+  .ai-note{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4;}
+  .ai-error{font-size:12.5px;color:#B4483A;margin-top:8px;}
+  .ai-task-list{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+  .ai-task-item{display:flex;align-items:flex-start;gap:8px;font-size:13.5px;background:var(--input-bg);border:1px solid var(--rule);border-radius:3px;padding:8px 10px;}
+  .ai-task-item input{margin-top:2px;}
   .proj-card{border:1px solid var(--rule);border-radius:4px;margin-bottom:10px;background:var(--paper-raised);}
   .proj-card.inactive{opacity:0.6;}
   .proj-card .body{padding:14px;}
@@ -336,6 +346,7 @@ function svg(name){
     restore:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M12 17v-4M10 15l2-2 2 2"/></svg>',
     x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+    sparkle:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M11 2l1.4 5.6L18 9l-5.6 1.4L11 16l-1.4-5.6L4 9l5.6-1.4L11 2z"/><path d="M19 13l.7 2.8L22.5 16.5l-2.8.7L19 20l-.7-2.8L15.5 16.5l2.8-.7L19 13z"/></svg>',
   };
   return icons[name] || "";
 }
@@ -651,6 +662,14 @@ let editingId = null;
 let formState = { name:"", description:"", increment:"15min", parentId:"" };
 let showInactive = false;
 
+/* Ask AI */
+let showAiPrompt = false;
+let aiPromptText = "";
+let aiLoading = false;
+let aiError = "";
+let pendingAiTasks = null;
+let aiSelectedTasks = new Set();
+
 function renderProjects(main){
   const topLevel = state.projects.filter(p=>!p.parentId);
   const visibleTop = topLevel.filter(p=> showInactive || p.status==="active");
@@ -659,8 +678,12 @@ function renderProjects(main){
   main.innerHTML = `
     <div class="proj-toolbar">
       <label><input type="checkbox" id="showInactive" ${showInactive?'checked':''}/> Show inactive</label>
-      <button class="btn-gold" id="newProjectBtn" style="display:flex;align-items:center;gap:6px;">${svg('plus')} New project</button>
+      <div class="proj-toolbar-actions">
+        <button class="btn-secondary" id="askAiBtn" style="display:flex;align-items:center;gap:6px;">${svg('sparkle')} Ask AI</button>
+        <button class="btn-gold" id="newProjectBtn" style="display:flex;align-items:center;gap:6px;">${svg('plus')} New project</button>
+      </div>
     </div>
+    <div id="aiArea">${showAiPrompt ? renderAiBoxHTML() : ""}</div>
     <div id="formArea">${showForm ? renderFormHTML() : ""}</div>
     ${visibleTop.length===0 ? `<div class="empty bordered">No projects yet.</div>` : ""}
     ${visibleTop.map(p=>{
@@ -702,12 +725,81 @@ function renderProjects(main){
 
   document.getElementById("showInactive").addEventListener("change", e=>{ showInactive = e.target.checked; renderProjects(main); });
   document.getElementById("newProjectBtn").addEventListener("click", ()=>{ openNewForm(""); });
+  document.getElementById("askAiBtn").addEventListener("click", ()=>{ openAiPrompt(); });
   document.querySelectorAll("[data-newsub]").forEach(btn=> btn.addEventListener("click", ()=> openNewForm(btn.dataset.newsub)));
   document.querySelectorAll("[data-edit]").forEach(btn=> btn.addEventListener("click", ()=> openEditForm(btn.dataset.edit)));
   document.querySelectorAll("[data-toggle]").forEach(btn=> btn.addEventListener("click", ()=> toggleStatus(btn.dataset.toggle)));
   document.querySelectorAll("[data-remove]").forEach(btn=> btn.addEventListener("click", ()=> removeProject(btn.dataset.remove)));
 
+  if(showAiPrompt) attachAiHandlers();
   if(showForm) attachFormHandlers();
+}
+
+function renderAiBoxHTML(){
+  return `
+    <div class="ai-box">
+      <div class="form-head">
+        <div class="title">${svg('sparkle')} Ask AI to draft a project</div>
+        <button class="icon-btn" id="closeAiBtn">${svg('x')}</button>
+      </div>
+      <div class="field" style="margin-top:0;">
+        <textarea id="aiPromptInput" rows="3" placeholder="e.g. Chapter 11 case for a mid-size manufacturer, detailed billing" ${aiLoading?'disabled':''}>${esc(aiPromptText)}</textarea>
+      </div>
+      <div class="ai-note">Describe the project in plain English. This sends only what you type here to Claude — none of your existing projects or time entries.</div>
+      ${aiError ? `<div class="ai-error">${esc(aiError)}</div>` : ""}
+      <button class="btn-dark" id="aiGenerateBtn" ${aiLoading?'disabled':''}>${aiLoading ? "Generating…" : "Generate"}</button>
+    </div>
+  `;
+}
+
+function attachAiHandlers(){
+  document.getElementById("closeAiBtn").addEventListener("click", ()=>{ showAiPrompt=false; aiError=""; renderProjects(document.getElementById("main")); });
+  document.getElementById("aiPromptInput").addEventListener("input", e=> aiPromptText = e.target.value);
+  document.getElementById("aiGenerateBtn").addEventListener("click", submitAiPrompt);
+}
+
+async function submitAiPrompt(){
+  const prompt = aiPromptText.trim();
+  if(!prompt || aiLoading) return;
+  aiLoading = true;
+  aiError = "";
+  renderProjects(document.getElementById("main"));
+  try{
+    const res = await fetch("/.netlify/functions/ask-ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await res.json().catch(()=> ({}));
+    if(!res.ok) throw new Error(data.error || "Something went wrong — try again.");
+
+    pendingAiTasks = Array.isArray(data.tasks) ? data.tasks.slice(0,6).map(t=>String(t)) : [];
+    aiSelectedTasks = new Set(pendingAiTasks.map((_,i)=>i));
+
+    formState = {
+      name: typeof data.name === "string" ? data.name.slice(0,120) : "",
+      description: typeof data.description === "string" ? data.description.slice(0,300) : "",
+      increment: ["6min","15min","30min"].includes(data.increment) ? data.increment : "15min",
+      parentId: "",
+      color: nextAutoColor(),
+    };
+    editingId = null;
+    showForm = true;
+    showAiPrompt = false;
+    aiPromptText = "";
+  } catch(err){
+    aiError = err.message || "Something went wrong — try again.";
+  } finally {
+    aiLoading = false;
+    renderProjects(document.getElementById("main"));
+  }
+}
+
+function openAiPrompt(){
+  showAiPrompt = true;
+  showForm = false;
+  aiError = "";
+  renderProjects(document.getElementById("main"));
 }
 
 function renderFormHTML(){
@@ -750,13 +842,26 @@ function renderFormHTML(){
         </div>
       </div>
       `}
+      ${pendingAiTasks && pendingAiTasks.length>0 && !editingId && !formState.parentId ? `
+      <div class="field">
+        <label>${svg('sparkle')} Suggested tasks — become sub-projects</label>
+        <div class="ai-task-list">
+          ${pendingAiTasks.map((t,i)=>`
+            <label class="ai-task-item">
+              <input type="checkbox" data-ai-task="${i}" ${aiSelectedTasks.has(i)?'checked':''}/>
+              <span>${esc(t)}</span>
+            </label>
+          `).join("")}
+        </div>
+      </div>
+      ` : ""}
       <button class="btn-dark" id="saveFormBtn">${editingId ? "Save changes" : "Create project"}</button>
     </div>
   `;
 }
 
 function attachFormHandlers(){
-  document.getElementById("closeFormBtn").addEventListener("click", ()=>{ showForm=false; renderProjects(document.getElementById("main")); });
+  document.getElementById("closeFormBtn").addEventListener("click", ()=>{ showForm=false; pendingAiTasks=null; aiSelectedTasks=new Set(); renderProjects(document.getElementById("main")); });
   document.getElementById("formName").addEventListener("input", e=> formState.name = e.target.value);
   document.getElementById("formDesc").addEventListener("input", e=> formState.description = e.target.value);
   document.getElementById("formIncrement").addEventListener("change", e=> formState.increment = e.target.value);
@@ -773,18 +878,26 @@ function attachFormHandlers(){
     formState.color = e.target.value;
     document.querySelectorAll("#colorGrid [data-color]").forEach(b=> b.classList.toggle("selected", b.dataset.color.toLowerCase()===e.target.value.toLowerCase()));
   });
+  document.querySelectorAll("[data-ai-task]").forEach(cb=>{
+    cb.addEventListener("change", e=>{
+      const i = Number(cb.dataset.aiTask);
+      if(e.target.checked) aiSelectedTasks.add(i); else aiSelectedTasks.delete(i);
+    });
+  });
 }
 
 function openNewForm(parentId){
   const parent = parentId ? state.projects.find(p=>p.id===parentId) : null;
   formState = { name:"", description:"", increment:"15min", parentId: parentId||"", color: parent ? parent.color : nextAutoColor() };
   editingId = null; showForm = true;
+  pendingAiTasks = null; aiSelectedTasks = new Set();
   renderProjects(document.getElementById("main"));
 }
 function openEditForm(id){
   const p = state.projects.find(p=>p.id===id);
   formState = { name:p.name, description:p.description||"", increment:p.increment, parentId:p.parentId||"", color:p.color };
   editingId = id; showForm = true;
+  pendingAiTasks = null; aiSelectedTasks = new Set();
   renderProjects(document.getElementById("main"));
 }
 function saveProjectForm(){
@@ -799,9 +912,19 @@ function saveProjectForm(){
       state.projects = state.projects.map(p=> p.parentId===editingId ? {...p, color} : p);
     }
   } else {
-    state.projects.push({ id:"p_"+Date.now(), parentId: formState.parentId||null, name:formState.name.trim(), description:formState.description.trim(), status:"active", increment:formState.increment, color });
+    const newId = "p_"+Date.now();
+    state.projects.push({ id:newId, parentId: formState.parentId||null, name:formState.name.trim(), description:formState.description.trim(), status:"active", increment:formState.increment, color });
+    if(!parent && pendingAiTasks && pendingAiTasks.length){
+      pendingAiTasks.forEach((task, i)=>{
+        if(!aiSelectedTasks.has(i)) return;
+        const taskName = String(task).trim().slice(0,120);
+        if(!taskName) return;
+        state.projects.push({ id: newId+"_t"+i, parentId:newId, name:taskName, description:"", status:"active", increment:formState.increment, color });
+      });
+    }
   }
   showForm = false;
+  pendingAiTasks = null; aiSelectedTasks = new Set();
   persist();
   renderProjects(document.getElementById("main"));
 }
