@@ -163,6 +163,7 @@
   .settings-note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
 
   .dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-right:7px;vertical-align:middle;}
+  .dot-outline{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-right:7px;vertical-align:middle;background:transparent;border:1.5px solid var(--rule-dark);}
   .proj-card{border-left:3px solid var(--rule);}
   .sub-row{position:relative;}
   .color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:4px;}
@@ -266,9 +267,15 @@ let state = {
 
 // Migration: assign a color to any project that predates the color feature
 state.projects.forEach((p, i) => { if(!p.color) p.color = COLOR_PALETTE[i % COLOR_PALETTE.length]; });
+// Sub-projects always match their parent's color — normalize any that predate that rule.
+state.projects.forEach(p => {
+  if(!p.parentId) return;
+  const parent = state.projects.find(pp=>pp.id===p.parentId);
+  if(parent) p.color = parent.color;
+});
 
 function nextAutoColor(){
-  const used = state.projects.map(p=>p.color);
+  const used = state.projects.filter(p=>!p.parentId).map(p=>p.color);
   const free = COLOR_PALETTE.find(c=> !used.includes(c));
   return free || COLOR_PALETTE[state.projects.length % COLOR_PALETTE.length];
 }
@@ -279,7 +286,9 @@ function hexToRgb(hex){
 }
 function projectColor(id){
   const p = state.projects.find(pr=>pr.id===id);
-  return (p && p.color) || "#7A7466";
+  if(!p) return "#7A7466";
+  if(p.parentId){ const parent = state.projects.find(pp=>pp.id===p.parentId); return (parent && parent.color) || p.color || "#7A7466"; }
+  return p.color || "#7A7466";
 }
 
 function persist(){
@@ -676,7 +685,7 @@ function renderProjects(main){
         ${subs.length>0 ? `<div class="sub-list">${subs.map(sp=>`
           <div class="sub-row ${sp.status==='inactive'?'inactive':''}">
             <div>
-              <div class="name"><span class="dot" style="background:${sp.color}"></span>${esc(sp.name)}</div>
+              <div class="name"><span class="dot-outline" style="border-color:${p.color}"></span>${esc(sp.name)}</div>
               ${sp.description ? `<div class="desc">${esc(sp.description)}</div>` : ""}
               <div class="inc">${esc(incLabel(sp.increment))}</div>
             </div>
@@ -721,6 +730,7 @@ function renderFormHTML(){
           ${INCREMENTS.map(i=>`<option value="${i.id}" ${i.id===formState.increment?'selected':''}>${i.label}</option>`).join("")}
         </select>
       </div>
+      ${!formState.parentId ? `
       <div class="field">
         <label>Color</label>
         <div class="color-grid" id="colorGrid">
@@ -731,6 +741,15 @@ function renderFormHTML(){
           <span>Or pick a custom shade</span>
         </div>
       </div>
+      ` : `
+      <div class="field">
+        <label>Color</label>
+        <div class="custom-color-row">
+          <span class="dot-outline" style="border-color:${formState.color}"></span>
+          <span>Matches its parent project's color</span>
+        </div>
+      </div>
+      `}
       <button class="btn-dark" id="saveFormBtn">${editingId ? "Save changes" : "Create project"}</button>
     </div>
   `;
@@ -749,14 +768,16 @@ function attachFormHandlers(){
       document.querySelectorAll("#colorGrid [data-color]").forEach(b=> b.classList.toggle("selected", b===btn));
     });
   });
-  document.getElementById("customColor").addEventListener("input", e=>{
+  const customColorInput = document.getElementById("customColor");
+  if(customColorInput) customColorInput.addEventListener("input", e=>{
     formState.color = e.target.value;
     document.querySelectorAll("#colorGrid [data-color]").forEach(b=> b.classList.toggle("selected", b.dataset.color.toLowerCase()===e.target.value.toLowerCase()));
   });
 }
 
 function openNewForm(parentId){
-  formState = { name:"", description:"", increment:"15min", parentId: parentId||"", color: nextAutoColor() };
+  const parent = parentId ? state.projects.find(p=>p.id===parentId) : null;
+  formState = { name:"", description:"", increment:"15min", parentId: parentId||"", color: parent ? parent.color : nextAutoColor() };
   editingId = null; showForm = true;
   renderProjects(document.getElementById("main"));
 }
@@ -768,10 +789,17 @@ function openEditForm(id){
 }
 function saveProjectForm(){
   if(!formState.name.trim()) return;
+  // Sub-projects always take their color from their parent — the color picker is hidden for them.
+  const parent = formState.parentId ? state.projects.find(p=>p.id===formState.parentId) : null;
+  const color = parent ? parent.color : formState.color;
   if(editingId){
-    state.projects = state.projects.map(p=> p.id===editingId ? {...p, name:formState.name.trim(), description:formState.description.trim(), increment:formState.increment, color:formState.color} : p);
+    state.projects = state.projects.map(p=> p.id===editingId ? {...p, name:formState.name.trim(), description:formState.description.trim(), increment:formState.increment, color} : p);
+    if(!parent){
+      // Editing a top-level project's color also updates its existing sub-projects.
+      state.projects = state.projects.map(p=> p.parentId===editingId ? {...p, color} : p);
+    }
   } else {
-    state.projects.push({ id:"p_"+Date.now(), parentId: formState.parentId||null, name:formState.name.trim(), description:formState.description.trim(), status:"active", increment:formState.increment, color:formState.color });
+    state.projects.push({ id:"p_"+Date.now(), parentId: formState.parentId||null, name:formState.name.trim(), description:formState.description.trim(), status:"active", increment:formState.increment, color });
   }
   showForm = false;
   persist();
