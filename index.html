@@ -134,6 +134,12 @@
   .report-row .rcount{color:var(--muted);font-size:12px;}
   .report-row .ramount{font-family:'IBM Plex Mono',monospace;}
 
+  .backup-section{margin-top:24px;padding-top:18px;border-top:1px solid var(--rule);}
+  .backup-section .backup-title{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;}
+  .backup-note{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5;}
+  .backup-actions{display:flex;gap:8px;}
+  .backup-actions .btn-secondary{flex:1;text-align:center;}
+
   @media (prefers-reduced-motion: reduce){ *{animation:none !important;transition:none !important;} }
 </style>
 </head>
@@ -648,11 +654,62 @@ function renderReport(main){
       ${rowsHTML || `<div class="empty" style="padding:20px 0;">No entries in this range.</div>`}
     </div>
     <button class="btn-gold" id="exportBtn" style="width:100%;margin-top:14px;padding:11px 0;" ${filtered.length===0?'disabled':''}>Export CSV</button>
+
+    <div class="backup-section">
+      <div class="backup-title">Backup &amp; restore</div>
+      <div class="backup-note">Data lives only in this browser's storage — clearing your browser data, reinstalling, or switching devices will erase it. Download a backup periodically to keep a safe copy.</div>
+      <div class="backup-actions">
+        <button class="btn-secondary" id="backupBtn">Download backup</button>
+        <button class="btn-secondary" id="restoreBtn">Restore from backup</button>
+      </div>
+      <input type="file" id="restoreFile" accept="application/json" class="hidden" />
+    </div>
   `;
 
   document.getElementById("fromInput").addEventListener("change", e=>{ reportFrom = e.target.value; renderReport(main); });
   document.getElementById("toInput").addEventListener("change", e=>{ reportTo = e.target.value; renderReport(main); });
   document.getElementById("exportBtn").addEventListener("click", ()=> exportCsv(byProject, totalBilled));
+  document.getElementById("backupBtn").addEventListener("click", downloadBackup);
+  document.getElementById("restoreBtn").addEventListener("click", ()=> document.getElementById("restoreFile").click());
+  document.getElementById("restoreFile").addEventListener("change", handleRestoreFile);
+}
+
+function downloadBackup(){
+  const payload = { entries: state.entries, projects: state.projects, running: state.running };
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const ts = new Date().toISOString().replace(/[:.]/g,"-");
+  a.href = url; a.download = `docket-backup_${ts}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function handleRestoreFile(e){
+  const input = e.target;
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try{ data = JSON.parse(reader.result); }
+    catch(err){ alert("That file isn't valid JSON."); input.value = ""; return; }
+    if(!data || !Array.isArray(data.entries) || !Array.isArray(data.projects)){
+      alert("That file doesn't look like a Docket backup (missing entries/projects arrays).");
+      input.value = "";
+      return;
+    }
+    const ok = confirm(`Restore ${data.entries.length} entries and ${data.projects.length} projects? This replaces everything currently in the app.`);
+    input.value = "";
+    if(!ok) return;
+    state.entries = data.entries;
+    state.projects = data.projects;
+    state.running = data.running || null;
+    persist();
+    renderReport(document.getElementById("main"));
+  };
+  reader.readAsText(file);
 }
 
 function exportCsv(byProject, totalBilled){

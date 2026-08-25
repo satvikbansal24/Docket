@@ -1,4 +1,4 @@
-const CACHE_NAME = "docket-v1";
+const CACHE_NAME = "docket-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -23,20 +23,40 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+function putInCache(request, response) {
+  if (response && response.status === 200 && response.type === "basic") {
+    const clone = response.clone();
+    caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+  }
+}
+
+// Navigation requests (index.html): always try the network first so updates
+// reach the user immediately; fall back to the cached copy only when offline.
+function networkFirst(request) {
+  return fetch(request)
+    .then((response) => {
+      putInCache(request, response);
+      return response;
+    })
+    .catch(() =>
+      caches.match(request).then((cached) => cached || caches.match("./index.html"))
+    );
+}
+
+// Static assets (manifest, icons): serve from cache immediately, they rarely change.
+function cacheFirst(request) {
+  return caches.match(request).then((cached) => {
+    if (cached) return cached;
+    return fetch(request).then((response) => {
+      putInCache(request, response);
+      return response;
+    });
+  });
+}
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200 && response.type === "basic") {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-    })
-  );
+  const isNavigation =
+    event.request.mode === "navigate" || event.request.destination === "document";
+  event.respondWith(isNavigation ? networkFirst(event.request) : cacheFirst(event.request));
 });
