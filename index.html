@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Docket" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root{
     --ink:#1C2333; --paper:#F7F3EC; --paper-raised:#FBF8F3;
@@ -134,6 +135,30 @@
   .report-row .rcount{color:var(--muted);font-size:12px;}
   .report-row .ramount{font-family:'IBM Plex Mono',monospace;}
 
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-right:7px;vertical-align:middle;}
+  .proj-card{border-left:3px solid var(--rule);}
+  .sub-row{position:relative;}
+  .color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:4px;}
+  .color-swatch{width:100%;aspect-ratio:1;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;}
+  .color-swatch.selected{border-color:var(--ink);box-shadow:0 0 0 2px var(--paper-raised), 0 0 0 3px var(--ink);}
+  .custom-color-row{display:flex;align-items:center;gap:8px;margin-top:8px;}
+  .custom-color-row input[type=color]{width:36px;height:36px;border:1px solid var(--rule);border-radius:50%;padding:0;background:none;overflow:hidden;}
+  .custom-color-row span{font-size:12px;color:var(--muted);}
+
+  .timer-live{text-align:center;font-family:'IBM Plex Mono',monospace;font-size:44px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .timer-live.paused{color:var(--muted);}
+  .timer-state-label{text-align:center;font-size:11px;color:var(--gold-dark);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;margin-bottom:2px;font-weight:600;}
+  .pause-row{display:flex;gap:8px;margin-top:12px;}
+  .btn-pause{background:var(--gold-dark);color:#fff;border:none;border-radius:3px;padding:12px 0;font-size:14px;font-weight:600;flex:1;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .btn-resume{background:var(--ink);color:#fff;border:none;border-radius:3px;padding:12px 0;font-size:14px;font-weight:600;flex:1;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .btn-submit{background:var(--gold-dark);color:#fff;border:none;border-radius:3px;padding:12px 0;font-size:14px;font-weight:600;flex:1;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .discard-link{background:none;border:none;color:var(--muted);font-size:12px;text-decoration:underline;padding:6px 4px;display:block;margin:6px auto 0;}
+
+  .export-row{display:flex;gap:8px;margin-top:14px;}
+  .btn-export{flex:1;background:var(--gold-dark);color:#fff;border:none;border-radius:3px;padding:11px 0;font-size:13px;font-weight:600;}
+  .btn-export.secondary{background:var(--ink);}
+  .btn-export:disabled{background:var(--rule);cursor:not-allowed;}
+
   @media (prefers-reduced-motion: reduce){ *{animation:none !important;transition:none !important;} }
 </style>
 </head>
@@ -183,9 +208,24 @@ const INCREMENTS = [
   { id:"30min", label:"30 min (0.5 hr)", minutes:30 },
 ];
 
+const COLOR_PALETTE = [
+  "#8C5A4A", // rust
+  "#5F7A8C", // slate blue
+  "#6E7F6C", // sage
+  "#8C5F6E", // dusty plum
+  "#4A6E7A", // deep teal
+  "#7A6E8C", // muted lavender
+  "#8C6E54", // umber
+  "#5A7A6E", // teal-sage
+  "#6E6E8C", // periwinkle
+  "#7A5A6E", // mauve
+  "#6E7A4A", // olive
+  "#8C7A5A", // sand
+];
+
 const DEFAULT_PROJECTS = [
-  { id:"p1", parentId:null, name:"Hughes Satellite Systems", description:"Chapter 11 — Valuation", status:"active", increment:"6min" },
-  { id:"p2", parentId:null, name:"Vi-Jon", description:"Bankruptcy advisory", status:"active", increment:"15min" },
+  { id:"p1", parentId:null, name:"Hughes Satellite Systems", description:"Chapter 11 — Valuation", status:"active", increment:"6min", color:"#8C5A4A" },
+  { id:"p2", parentId:null, name:"Vi-Jon", description:"Bankruptcy advisory", status:"active", increment:"15min", color:"#5F7A8C" },
 ];
 
 let state = {
@@ -193,6 +233,24 @@ let state = {
   projects: LS.get("dk_projects", DEFAULT_PROJECTS),
   running: LS.get("dk_running", null),
 };
+
+// Migration: assign a color to any project that predates the color feature
+state.projects.forEach((p, i) => { if(!p.color) p.color = COLOR_PALETTE[i % COLOR_PALETTE.length]; });
+
+function nextAutoColor(){
+  const used = state.projects.map(p=>p.color);
+  const free = COLOR_PALETTE.find(c=> !used.includes(c));
+  return free || COLOR_PALETTE[state.projects.length % COLOR_PALETTE.length];
+}
+
+function hexToRgb(hex){
+  const h = hex.replace("#","");
+  return [parseInt(h.substring(0,2),16), parseInt(h.substring(2,4),16), parseInt(h.substring(4,6),16)];
+}
+function projectColor(id){
+  const p = state.projects.find(pr=>pr.id===id);
+  return (p && p.color) || "#7A7466";
+}
 
 function persist(){
   LS.set("dk_entries", state.entries);
@@ -285,12 +343,14 @@ function renderTimer(main){
   selectedTimerProject = selectedProject;
 
   const running = state.running;
-  const elapsed = running ? Math.floor((Date.now()-new Date(running.startedAt).getTime())/1000) : 0;
+  const isTicking = running && running.startedAt;
+  const liveElapsed = running ? liveElapsedSeconds() : 0;
 
   main.innerHTML = `
     <div class="card">
-      <div class="timer-display ${running?'running':''}" id="timerDisplay">${fmtHMS(running?elapsed:0)}</div>
-      ${running ? `<div class="billing-note" id="billingNote">billing at ${fmtH(roundToIncrement(elapsed, incrementMinutes(running.projectId)))}h (${incrementMinutes(running.projectId)}-min increments)</div>` : ""}
+      <div class="timer-live ${isTicking?'':'paused'}" id="timerDisplay">${fmtHMS(liveElapsed)}</div>
+      ${running ? `<div class="timer-state-label">${isTicking ? 'Running' : 'Paused'}</div>` : ""}
+      ${running ? `<div class="billing-note" id="billingNote">would bill ${fmtH(roundToIncrement(liveElapsed, incrementMinutes(running.projectId)))}h at submit (${incrementMinutes(running.projectId)}-min increments)</div>` : ""}
       <div class="field">
         <label>Project</label>
         <select id="projectSelect" ${running?'disabled':''}>
@@ -301,14 +361,22 @@ function renderTimer(main){
         <label>Note (optional)</label>
         <input id="noteInput" type="text" placeholder="What are you working on?" value="${esc(running ? running.note : timerNote)}" />
       </div>
-      <div class="row" style="margin-top:12px;">
-        ${running
-          ? `<button class="btn-stop" id="stopBtn">${svg('stop')} Stop &amp; log</button>`
-          : `<button class="btn-primary" id="startBtn">${svg('play')} Start timer</button>`
-        }
-        <button class="btn-secondary" id="manualToggle">Log manually</button>
-      </div>
-      <div id="manualBox" class="manual-box ${showManual?'':'hidden'}">
+      ${!running ? `
+        <div class="row" style="margin-top:12px;">
+          <button class="btn-primary" id="startBtn">${svg('play')} Start timer</button>
+          <button class="btn-secondary" id="manualToggle">Log manually</button>
+        </div>
+      ` : `
+        <div class="pause-row">
+          ${isTicking
+            ? `<button class="btn-pause" id="pauseBtn">${svg('stop')} Pause</button>`
+            : `<button class="btn-resume" id="resumeBtn">${svg('play')} Resume</button>`
+          }
+          <button class="btn-submit" id="submitBtn">Submit &amp; log</button>
+        </div>
+        <button class="discard-link" id="discardBtn">Discard this timer</button>
+      `}
+      <div id="manualBox" class="manual-box ${showManual && !running?'':'hidden'}">
         <select id="manualProjectSelect">
           ${actives.map(p=>`<option value="${p.id}" ${p.id===manualProject?'selected':''}>${esc(projectPath(p.id))}</option>`).join("")}
         </select>
@@ -334,12 +402,15 @@ function renderTimer(main){
     else timerNote = e.target.value;
   });
   if(running){
-    document.getElementById("stopBtn").addEventListener("click", stopTimer);
+    if(isTicking) document.getElementById("pauseBtn").addEventListener("click", pauseTimer);
+    else document.getElementById("resumeBtn").addEventListener("click", resumeTimer);
+    document.getElementById("submitBtn").addEventListener("click", submitTimer);
+    document.getElementById("discardBtn").addEventListener("click", discardTimer);
   } else {
     document.getElementById("startBtn").addEventListener("click", startTimer);
   }
-  document.getElementById("manualToggle").addEventListener("click", ()=>{ showManual = !showManual; renderTimer(main); });
-  if(showManual){
+  document.getElementById("manualToggle") && document.getElementById("manualToggle").addEventListener("click", ()=>{ showManual = !showManual; renderTimer(main); });
+  if(showManual && !running){
     document.getElementById("manualProjectSelect").addEventListener("change", e=>{ manualProject = e.target.value; });
     document.getElementById("manualLogBtn").addEventListener("click", addManualEntry);
   }
@@ -350,40 +421,70 @@ function renderTimer(main){
 
 let selectedTimerProject = null;
 
+function liveElapsedSeconds(){
+  if(!state.running) return 0;
+  const base = state.running.accumulatedSeconds || 0;
+  if(state.running.startedAt){
+    return base + Math.floor((Date.now()-new Date(state.running.startedAt).getTime())/1000);
+  }
+  return base;
+}
+
 function renderTimerTick(){
-  if(currentTab !== "timer" || !state.running) return;
-  const elapsed = Math.floor((Date.now()-new Date(state.running.startedAt).getTime())/1000);
+  if(currentTab !== "timer" || !state.running || !state.running.startedAt) return;
+  const elapsed = liveElapsedSeconds();
   const disp = document.getElementById("timerDisplay");
   if(disp) disp.textContent = fmtHMS(elapsed);
   const note = document.getElementById("billingNote");
-  if(note) note.textContent = `billing at ${fmtH(roundToIncrement(elapsed, incrementMinutes(state.running.projectId)))}h (${incrementMinutes(state.running.projectId)}-min increments)`;
+  if(note) note.textContent = `would bill ${fmtH(roundToIncrement(elapsed, incrementMinutes(state.running.projectId)))}h at submit (${incrementMinutes(state.running.projectId)}-min increments)`;
   const todayEl = document.getElementById("todayTotal");
   if(todayEl) todayEl.textContent = `${fmtH(todayTotalSeconds())}h`;
 }
 
 function todayTotalSeconds(){
   const today = todayKey();
-  let total = state.entries.filter(e=>e.date===today).reduce((s,e)=>s+e.billedSeconds,0);
-  if(state.running) total += roundToIncrement(Math.floor((Date.now()-new Date(state.running.startedAt).getTime())/1000), incrementMinutes(state.running.projectId));
-  return total;
+  return state.entries.filter(e=>e.date===today).reduce((s,e)=>s+e.billedSeconds,0);
 }
 
 function startTimer(){
   if(!selectedTimerProject) return;
-  state.running = { projectId: selectedTimerProject, note: timerNote, startedAt: new Date().toISOString() };
+  const now = new Date().toISOString();
+  state.running = { projectId: selectedTimerProject, note: timerNote, startedAt: now, accumulatedSeconds: 0, firstStartedAt: now };
   persist();
   renderTimer(document.getElementById("main"));
 }
-function stopTimer(){
+function pauseTimer(){
+  if(!state.running || !state.running.startedAt) return;
+  const elapsed = liveElapsedSeconds();
+  state.running.accumulatedSeconds = elapsed;
+  state.running.startedAt = null;
+  persist();
+  renderTimer(document.getElementById("main"));
+}
+function resumeTimer(){
+  if(!state.running || state.running.startedAt) return;
+  state.running.startedAt = new Date().toISOString();
+  persist();
+  renderTimer(document.getElementById("main"));
+}
+function submitTimer(){
   if(!state.running) return;
-  const start = new Date(state.running.startedAt), end = new Date();
-  const rawSeconds = Math.max(1, Math.floor((end-start)/1000));
+  const rawSeconds = Math.max(1, liveElapsedSeconds());
   const inc = incrementMinutes(state.running.projectId);
   const billedSeconds = roundToIncrement(rawSeconds, inc);
+  const startedAtForDate = state.running.firstStartedAt || state.running.startedAt || new Date().toISOString();
   state.entries.unshift({
     id: "e_"+Date.now(), projectId: state.running.projectId, note: state.running.note,
-    rawSeconds, billedSeconds, date: todayKey(start), startedAt: state.running.startedAt, endedAt: end.toISOString(),
+    rawSeconds, billedSeconds, date: todayKey(), startedAt: startedAtForDate, endedAt: new Date().toISOString(),
   });
+  state.running = null;
+  timerNote = "";
+  persist();
+  renderTimer(document.getElementById("main"));
+}
+function discardTimer(){
+  if(!state.running) return;
+  if(!confirm("Discard this running timer without logging any time?")) return;
   state.running = null;
   timerNote = "";
   persist();
@@ -424,11 +525,12 @@ function renderLedgerHTML(){
         ${collapsed ? "" : dayEntries.map(e=>`
           <div class="entry-row">
             <div style="min-width:0;">
-              <div class="name">${esc(projectPath(e.projectId))}</div>
+              <div class="name"><span class="dot" style="background:${projectColor(e.projectId)}"></span>${esc(projectPath(e.projectId))}</div>
               ${e.note ? `<div class="note">${esc(e.note)}</div>` : ""}
             </div>
             <div class="right">
               <span class="amount">${fmtH(e.billedSeconds)}h</span>
+              <button class="icon-btn" data-resume="${e.id}" aria-label="Resume this entry" title="Resume">${svg('play')}</button>
               <button class="icon-btn" data-delete="${e.id}" aria-label="Delete entry">${svg('trash')}</button>
             </div>
           </div>
@@ -457,6 +559,33 @@ function attachLedgerHandlers(){
       if(todayEl) todayEl.textContent = `${fmtH(todayTotalSeconds())}h`;
     });
   });
+  document.querySelectorAll("[data-resume]").forEach(btn=>{
+    btn.addEventListener("click", ()=> resumeEntry(btn.dataset.resume));
+  });
+}
+
+function resumeEntry(entryId){
+  if(state.running){
+    if(!confirm("A timer is already running. Discard it and resume this entry instead?")) return;
+  }
+  const entry = state.entries.find(e=>e.id===entryId);
+  if(!entry) return;
+  if(!confirm(`Resume this entry? It'll go back to tracking live time from ${fmtH(entry.rawSeconds)}h raw (unrounded) — you'll need to submit again to log it.`)) return;
+
+  state.entries = state.entries.filter(e=>e.id!==entryId);
+  state.running = {
+    projectId: entry.projectId,
+    note: entry.note || "",
+    startedAt: new Date().toISOString(),
+    accumulatedSeconds: entry.rawSeconds,
+    firstStartedAt: entry.startedAt,
+  };
+  timerNote = entry.note || "";
+  persist();
+
+  currentTab = "timer";
+  document.querySelectorAll(".tab").forEach(b=> b.classList.toggle("active", b.dataset.tab==="timer"));
+  render();
 }
 
 /* ---------- Projects View ---------- */
@@ -480,11 +609,11 @@ function renderProjects(main){
     ${visibleTop.map(p=>{
       const subs = subsOf(p.id).filter(sp=> showInactive || sp.status==="active");
       return `
-      <div class="proj-card ${p.status==='inactive'?'inactive':''}">
+      <div class="proj-card ${p.status==='inactive'?'inactive':''}" style="border-left-color:${p.color}">
         <div class="body">
           <div class="top">
             <div style="min-width:0;">
-              <div class="name">${esc(p.name)}</div>
+              <div class="name"><span class="dot" style="background:${p.color}"></span>${esc(p.name)}</div>
               ${p.description ? `<div class="desc">${esc(p.description)}</div>` : ""}
               <div class="inc">${esc(incLabel(p.increment))}</div>
             </div>
@@ -499,7 +628,7 @@ function renderProjects(main){
         ${subs.length>0 ? `<div class="sub-list">${subs.map(sp=>`
           <div class="sub-row ${sp.status==='inactive'?'inactive':''}">
             <div>
-              <div class="name">${esc(sp.name)}</div>
+              <div class="name"><span class="dot" style="background:${sp.color}"></span>${esc(sp.name)}</div>
               ${sp.description ? `<div class="desc">${esc(sp.description)}</div>` : ""}
               <div class="inc">${esc(incLabel(sp.increment))}</div>
             </div>
@@ -544,6 +673,16 @@ function renderFormHTML(){
           ${INCREMENTS.map(i=>`<option value="${i.id}" ${i.id===formState.increment?'selected':''}>${i.label}</option>`).join("")}
         </select>
       </div>
+      <div class="field">
+        <label>Color</label>
+        <div class="color-grid" id="colorGrid">
+          ${COLOR_PALETTE.map(c=>`<button type="button" class="color-swatch ${c===formState.color?'selected':''}" data-color="${c}" style="background:${c}" aria-label="Choose color"></button>`).join("")}
+        </div>
+        <div class="custom-color-row">
+          <input type="color" id="customColor" value="${formState.color}" />
+          <span>Or pick a custom shade</span>
+        </div>
+      </div>
       <button class="btn-dark" id="saveFormBtn">${editingId ? "Save changes" : "Create project"}</button>
     </div>
   `;
@@ -555,25 +694,36 @@ function attachFormHandlers(){
   document.getElementById("formDesc").addEventListener("input", e=> formState.description = e.target.value);
   document.getElementById("formIncrement").addEventListener("change", e=> formState.increment = e.target.value);
   document.getElementById("saveFormBtn").addEventListener("click", saveProjectForm);
+  document.querySelectorAll("#colorGrid [data-color]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      formState.color = btn.dataset.color;
+      document.getElementById("customColor").value = btn.dataset.color;
+      document.querySelectorAll("#colorGrid [data-color]").forEach(b=> b.classList.toggle("selected", b===btn));
+    });
+  });
+  document.getElementById("customColor").addEventListener("input", e=>{
+    formState.color = e.target.value;
+    document.querySelectorAll("#colorGrid [data-color]").forEach(b=> b.classList.toggle("selected", b.dataset.color.toLowerCase()===e.target.value.toLowerCase()));
+  });
 }
 
 function openNewForm(parentId){
-  formState = { name:"", description:"", increment:"15min", parentId: parentId||"" };
+  formState = { name:"", description:"", increment:"15min", parentId: parentId||"", color: nextAutoColor() };
   editingId = null; showForm = true;
   renderProjects(document.getElementById("main"));
 }
 function openEditForm(id){
   const p = state.projects.find(p=>p.id===id);
-  formState = { name:p.name, description:p.description||"", increment:p.increment, parentId:p.parentId||"" };
+  formState = { name:p.name, description:p.description||"", increment:p.increment, parentId:p.parentId||"", color:p.color };
   editingId = id; showForm = true;
   renderProjects(document.getElementById("main"));
 }
 function saveProjectForm(){
   if(!formState.name.trim()) return;
   if(editingId){
-    state.projects = state.projects.map(p=> p.id===editingId ? {...p, name:formState.name.trim(), description:formState.description.trim(), increment:formState.increment} : p);
+    state.projects = state.projects.map(p=> p.id===editingId ? {...p, name:formState.name.trim(), description:formState.description.trim(), increment:formState.increment, color:formState.color} : p);
   } else {
-    state.projects.push({ id:"p_"+Date.now(), parentId: formState.parentId||null, name:formState.name.trim(), description:formState.description.trim(), status:"active", increment:formState.increment });
+    state.projects.push({ id:"p_"+Date.now(), parentId: formState.parentId||null, name:formState.name.trim(), description:formState.description.trim(), status:"active", increment:formState.increment, color:formState.color });
   }
   showForm = false;
   persist();
@@ -624,7 +774,7 @@ function renderReport(main){
       const name = id===tid ? "(direct)" : p.name;
       rowsHTML += `
         <div class="report-row">
-          <span class="rname ${name==='(direct)'?'muted':''}">${esc(name)}</span>
+          <span class="rname ${name==='(direct)'?'muted':''}"><span class="dot" style="background:${projectColor(id)}"></span>${esc(name)}</span>
           <span class="rright">
             <span class="rcount">${v.count} ${v.count===1?'entry':'entries'}</span>
             <span class="ramount">${fmtH(v.billed)}h</span>
@@ -647,12 +797,16 @@ function renderReport(main){
       <div class="report-sub">${filtered.length} entries · billed hours reflect each project's rounding rule</div>
       ${rowsHTML || `<div class="empty" style="padding:20px 0;">No entries in this range.</div>`}
     </div>
-    <button class="btn-gold" id="exportBtn" style="width:100%;margin-top:14px;padding:11px 0;" ${filtered.length===0?'disabled':''}>Export CSV</button>
+    <div class="export-row">
+      <button class="btn-export" id="exportCsvBtn" ${filtered.length===0?'disabled':''}>Export CSV</button>
+      <button class="btn-export secondary" id="exportPdfBtn" ${filtered.length===0?'disabled':''}>Export PDF</button>
+    </div>
   `;
 
   document.getElementById("fromInput").addEventListener("change", e=>{ reportFrom = e.target.value; renderReport(main); });
   document.getElementById("toInput").addEventListener("change", e=>{ reportTo = e.target.value; renderReport(main); });
-  document.getElementById("exportBtn").addEventListener("click", ()=> exportCsv(byProject, totalBilled));
+  document.getElementById("exportCsvBtn").addEventListener("click", ()=> exportCsv(byProject, totalBilled));
+  document.getElementById("exportPdfBtn").addEventListener("click", ()=> exportPdf(byProject, totalBilled, filtered));
 }
 
 function exportCsv(byProject, totalBilled){
@@ -667,6 +821,168 @@ function exportCsv(byProject, totalBilled){
   a.href = url; a.download = `time-report_${reportFrom}_to_${reportTo}.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function exportPdf(byProject, totalBilled, filteredEntries){
+  if(!window.jspdf){ alert("PDF library still loading — try again in a moment (requires an internet connection the first time)."); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"mm", format:"a4" });
+  const INK_RGB = hexToRgb("#1C2333");
+  const PAPER_RGB = hexToRgb("#F7F3EC");
+  const GOLD_RGB = hexToRgb("#9C7A34");
+  const MUTED_RGB = hexToRgb("#7A7466");
+  const RULE_RGB = hexToRgb("#DAD3C4");
+  const PW = 210, PH = 297, M = 15;
+  let page = 1;
+
+  function drawHeader(subtitle){
+    doc.setFillColor(...INK_RGB);
+    doc.rect(0, 0, PW, 34, "F");
+    doc.setTextColor(...PAPER_RGB);
+    doc.setFont("times", "bold");
+    doc.setFontSize(24);
+    doc.text("Docket", M, 18);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(200, 194, 178);
+    doc.text(subtitle.toUpperCase(), M, 25);
+    doc.setDrawColor(...GOLD_RGB);
+    doc.setLineWidth(0.6);
+    doc.line(M, 29, PW-M, 29);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...PAPER_RGB);
+    doc.text(`${reportFrom}  —  ${reportTo}`, PW-M, 16, { align:"right" });
+    doc.setFontSize(7.5);
+    doc.setTextColor(180, 174, 158);
+    doc.text(`Generated ${new Date().toLocaleDateString()}`, PW-M, 21, { align:"right" });
+  }
+
+  function drawFooter(){
+    doc.setFontSize(7.5);
+    doc.setTextColor(...MUTED_RGB);
+    doc.setFont("helvetica", "normal");
+    doc.text("Docket — Time & Billing Ledger", M, PH-10);
+    doc.text(`Page ${page}`, PW-M, PH-10, { align:"right" });
+    doc.setDrawColor(...RULE_RGB);
+    doc.setLineWidth(0.2);
+    doc.line(M, PH-13, PW-M, PH-13);
+  }
+
+  function newPage(subtitle){
+    doc.addPage();
+    page += 1;
+    drawHeader(subtitle);
+    drawFooter();
+    return 44;
+  }
+
+  drawHeader("Time & Billing Report");
+  drawFooter();
+  let y = 44;
+
+  // --- Summary section ---
+  doc.setFont("times", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(...INK_RGB);
+  doc.text("Summary", M, y);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(19);
+  doc.text(`${fmtH(totalBilled)}h`, PW-M, y, { align:"right" });
+  y += 3;
+  doc.setDrawColor(...INK_RGB);
+  doc.setLineWidth(0.5);
+  doc.line(M, y, PW-M, y);
+  y += 9;
+
+  const topLevelIds = state.projects.filter(p=>!p.parentId).map(p=>p.id);
+  const barWidth = PW - 2*M - 30;
+
+  topLevelIds.forEach(tid=>{
+    const top = state.projects.find(p=>p.id===tid);
+    const subIds = state.projects.filter(p=>p.parentId===tid).map(p=>p.id);
+    const relevantIds = [tid, ...subIds].filter(id=> byProject[id]);
+    if(relevantIds.length===0) return;
+    const groupTotal = relevantIds.reduce((s,id)=> s + byProject[id].billed, 0);
+    const share = totalBilled ? groupTotal/totalBilled : 0;
+
+    if(y > PH - 45){ y = newPage("Time & Billing Report — Summary (cont.)"); }
+
+    const rgb = hexToRgb(top.color || "#7A7466");
+    doc.setFillColor(...rgb);
+    doc.circle(M+1.5, y-1.3, 1.5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...INK_RGB);
+    doc.text(top.name, M+6, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    doc.text(`${fmtH(groupTotal)}h`, PW-M, y, { align:"right" });
+    y += 3;
+    doc.setFillColor(...RULE_RGB);
+    doc.roundedRect(M+6, y, barWidth, 2.2, 1.1, 1.1, "F");
+    doc.setFillColor(...rgb);
+    doc.roundedRect(M+6, y, Math.max(2.2, barWidth*share), 2.2, 1.1, 1.1, "F");
+    y += 9;
+  });
+
+  // --- Log by day section ---
+  y += 4;
+  if(y > PH - 50){ y = newPage("Time & Billing Report — Log by Day"); }
+  doc.setFont("times", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(...INK_RGB);
+  doc.text("Log by Day", M, y);
+  y += 3;
+  doc.setDrawColor(...INK_RGB);
+  doc.line(M, y, PW-M, y);
+  y += 10;
+
+  const grouped = {};
+  filteredEntries.forEach(e=>{ (grouped[e.date] = grouped[e.date]||[]).push(e); });
+  const dayKeys = Object.keys(grouped).sort();
+
+  dayKeys.forEach(day=>{
+    const dayEntries = grouped[day].slice().sort((a,b)=> new Date(a.startedAt)-new Date(b.startedAt));
+    const dayTotal = dayEntries.reduce((s,e)=>s+e.billedSeconds,0);
+
+    if(y > PH - 40){ y = newPage("Time & Billing Report — Log by Day (cont.)"); }
+
+    doc.setFillColor(240, 236, 227);
+    doc.rect(M, y-4.5, PW-2*M, 7.5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...INK_RGB);
+    doc.text(dayLabel(day) + "  ·  " + day, M+3, y);
+    doc.text(`${fmtH(dayTotal)}h`, PW-M-3, y, { align:"right" });
+    y += 9;
+
+    dayEntries.forEach(e=>{
+      if(y > PH - 30){ y = newPage("Time & Billing Report — Log by Day (cont.)"); }
+      const rgb = hexToRgb(projectColor(e.projectId));
+      doc.setFillColor(...rgb);
+      doc.circle(M+2, y-1.3, 1.3, "F");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(...INK_RGB);
+      doc.text(projectPath(e.projectId), M+6, y);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${fmtH(e.billedSeconds)}h`, PW-M, y, { align:"right" });
+      y += 4.6;
+      if(e.note){
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(8.5);
+        doc.setTextColor(...MUTED_RGB);
+        const noteLines = doc.splitTextToSize(e.note, PW-2*M-10);
+        doc.text(noteLines, M+6, y);
+        y += 4.2*noteLines.length;
+      }
+      y += 2.5;
+    });
+    y += 3;
+  });
+
+  doc.save(`docket-report_${reportFrom}_to_${reportTo}.pdf`);
 }
 
 /* ---------- PIN Lock ---------- */

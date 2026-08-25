@@ -18,6 +18,9 @@ Your data (projects, time entries) is stored in your phone's browser storage, no
 2. Tap the **Share** icon → **Add to Home Screen**.
 3. It now sits on your home screen with its own icon and opens full-screen, no browser bar.
 
+## PDF reports
+The Report tab now offers both CSV and a designed PDF export (summary by project with color bars, plus a full day-by-day log). The PDF export loads a small library from the internet the first time you use it — after that it's cached and works offline too.
+
 ## First launch
 You'll be asked to set a 4-digit PIN — this locks the app so the link alone isn't enough to see your data. You'll enter it each time you open Docket.
 
