@@ -1,0 +1,15 @@
+{
+  "name": "Docket — Time & Billing",
+  "short_name": "Docket",
+  "description": "Personal billable-hours tracker with projects, sub-projects, and date-range reports.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F7F3EC",
+  "theme_color": "#1C2333",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

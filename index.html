@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Docket — Time & Billing</title>
+<meta name="theme-color" content="#1C2333" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Docket" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1C2333; --paper:#F7F3EC; --paper-raised:#FBF8F3;
+    --rule:#DAD3C4; --rule-dark:#C7BEA9; --gold:#9C7A34; --gold-dark:#7A5F27;
+    --gold-bg:#F0ECE3; --muted:#7A7466;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent; -webkit-text-size-adjust:100%;}
+  input,select,textarea,button{font-family:inherit;}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--gold);outline-offset:1px;}
+  button{cursor:pointer;}
+  button:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .serif{font-family:'Source Serif 4',serif;}
+  #app{max-width:640px;margin:0 auto;padding-bottom:60px;min-height:100vh;}
+  .hidden{display:none !important;}
+
+  /* Lock screen */
+  #lock{position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;justify-content:center;
+    flex-direction:column;z-index:100;padding:24px;}
+  #lock .title{font-family:'Source Serif 4',serif;color:var(--paper);font-size:22px;font-weight:700;margin-bottom:4px;}
+  #lock .sub{color:#9a94854;color:#a39c8c;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:28px;}
+  #pinDots{display:flex;gap:14px;margin-bottom:26px;}
+  .pinDot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--gold);background:transparent;}
+  .pinDot.filled{background:var(--gold);}
+  #pinPad{display:grid;grid-template-columns:repeat(3,64px);gap:14px;}
+  .pinKey{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);
+    color:var(--paper);font-size:20px;font-weight:500;display:flex;align-items:center;justify-content:center;}
+  .pinKey:active{background:rgba(255,255,255,0.14);}
+  #lockError{color:#D98B7A;font-size:13px;margin-top:14px;min-height:16px;}
+  #setupNote{color:#a39c8c;font-size:12.5px;text-align:center;max-width:280px;margin-top:18px;line-height:1.5;}
+
+  /* Header */
+  header{border-bottom:1px solid var(--rule);padding:24px 20px 0;}
+  header .brand{font-family:'Source Serif 4',serif;font-size:24px;font-weight:700;letter-spacing:-0.01em;}
+  header .tagline{font-size:12px;color:var(--muted);margin:2px 0 16px;letter-spacing:.03em;text-transform:uppercase;}
+  nav{display:flex;}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0 8px;background:none;border:none;
+    color:var(--muted);border-bottom:2px solid transparent;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.03em;}
+  .tab.active{color:var(--ink);border-bottom-color:var(--gold-dark);font-weight:600;}
+  .tab svg{width:17px;height:17px;}
+
+  main{padding:20px;}
+  .card{background:var(--paper-raised);border:1px solid var(--rule);border-radius:4px;padding:24px;}
+  .field{margin-top:10px;}
+  .field label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px;}
+  .field input, .field select, .field textarea{width:100%;padding:10px 12px;border-radius:3px;border:1px solid var(--rule);font-size:14px;background:#fff;color:var(--ink);}
+  .row{display:flex;gap:8px;}
+  .btn-primary{background:var(--gold-dark);color:#fff;border:none;border-radius:3px;padding:12px 0;font-size:14px;font-weight:600;flex:1;
+    display:flex;align-items:center;justify-content:center;gap:8px;}
+  .btn-stop{background:var(--ink);color:#fff;border:none;border-radius:3px;padding:12px 0;font-size:14px;font-weight:600;flex:1;
+    display:flex;align-items:center;justify-content:center;gap:8px;}
+  .btn-secondary{background:transparent;color:var(--ink);border:1px solid var(--rule);border-radius:3px;padding:12px 16px;font-size:13px;}
+  .btn-dark{background:var(--ink);color:#fff;border:none;border-radius:3px;padding:10px 0;font-size:13px;font-weight:600;width:100%;margin-top:4px;}
+  .btn-gold{background:var(--gold-dark);color:#fff;border:none;border-radius:3px;padding:8px 14px;font-size:13px;font-weight:600;}
+  .timer-display{text-align:center;font-family:'IBM Plex Mono',monospace;font-size:44px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .timer-display.running{color:var(--ink);}
+  .billing-note{text-align:center;font-size:12px;color:var(--muted);margin-top:-4px;margin-bottom:8px;}
+  .manual-box{background:var(--gold-bg);padding:10px;border-radius:3px;display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+  .manual-box .row input:first-child{width:80px;flex:none;}
+  .manual-box .row input{padding:8px 10px;border-radius:3px;border:1px solid var(--rule);font-size:13px;}
+  .manual-box select{padding:8px 10px;border-radius:3px;border:1px solid var(--rule);font-size:13px;}
+
+  .summary-strip{display:flex;justify-content:space-between;align-items:center;margin-top:18px;padding:0 4px;}
+  .summary-strip .label{font-size:13px;color:var(--muted);}
+  .summary-strip .value{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;}
+
+  .day-group{border-top:1px solid var(--rule);}
+  .day-header{width:100%;display:flex;justify-content:space-between;align-items:center;background:none;border:none;padding:12px 4px;color:var(--ink);}
+  .day-header .label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
+  .day-header .total{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--muted);}
+  .entry-row{display:flex;justify-content:space-between;align-items:center;padding:10px 4px 10px 22px;border-top:1px dashed var(--rule);}
+  .entry-row .name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .entry-row .note{font-size:12.5px;color:var(--muted);margin-top:2px;}
+  .entry-row .right{display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:10px;}
+  .entry-row .amount{font-family:'IBM Plex Mono',monospace;font-size:13.5px;}
+  .icon-btn{background:none;border:none;color:var(--muted);padding:4px;display:flex;}
+  .icon-btn svg{width:14px;height:14px;}
+  .empty{text-align:center;color:var(--muted);font-size:14px;padding:36px 0;}
+  .empty.bordered{border:1px dashed var(--rule-dark);border-radius:4px;padding:40px 20px;}
+
+  /* Projects */
+  .proj-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .proj-toolbar label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);}
+  .form-box{background:var(--gold-bg);border-radius:4px;padding:16px;margin-bottom:16px;}
+  .form-box .form-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .form-box .form-head .title{font-size:13px;font-weight:600;}
+  .form-box textarea{resize:vertical;}
+  .proj-card{border:1px solid var(--rule);border-radius:4px;margin-bottom:10px;background:var(--paper-raised);}
+  .proj-card.inactive{opacity:0.6;}
+  .proj-card .body{padding:14px;}
+  .proj-card .top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .proj-card .name{font-size:15px;font-weight:600;}
+  .proj-card .desc{font-size:13px;color:var(--muted);margin-top:3px;}
+  .proj-card .inc{font-size:11.5px;color:var(--gold-dark);margin-top:6px;text-transform:uppercase;letter-spacing:.03em;}
+  .proj-card .actions{display:flex;gap:6px;flex-shrink:0;margin-left:8px;}
+  .subproj-btn{margin-top:10px;display:flex;align-items:center;gap:5px;background:none;border:1px solid var(--rule);border-radius:3px;padding:5px 10px;font-size:12px;color:var(--gold-dark);}
+  .subproj-btn svg{width:12px;height:12px;}
+  .sub-list{border-top:1px solid var(--rule);}
+  .sub-row{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 14px 10px 28px;border-top:1px dashed var(--rule);}
+  .sub-row.inactive{opacity:0.6;}
+  .sub-row .name{font-size:13.5px;font-weight:500;}
+  .sub-row .desc{font-size:12px;color:var(--muted);margin-top:2px;}
+  .sub-row .inc{font-size:11px;color:var(--gold-dark);margin-top:4px;text-transform:uppercase;letter-spacing:.03em;}
+
+  /* Report */
+  .date-row{display:flex;gap:10px;margin-bottom:16px;}
+  .date-row .field{flex:1;margin-top:0;}
+  .report-card{background:var(--paper-raised);border:1px solid var(--rule);border-radius:4px;padding:18px 16px;}
+  .report-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+  .report-head .range{font-family:'Source Serif 4',serif;font-size:16px;font-weight:700;}
+  .report-head .total{font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;}
+  .report-sub{font-size:12px;color:var(--muted);margin-bottom:12px;}
+  .report-group{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:14px;margin-bottom:4px;border-top:1px solid var(--rule);padding-top:10px;}
+  .report-group.first{margin-top:0;border-top:none;padding-top:0;}
+  .report-row{display:flex;justify-content:space-between;padding:5px 0 5px 10px;font-size:13.5px;}
+  .report-row .rname.muted{color:var(--muted);}
+  .report-row .rright{display:flex;gap:12px;}
+  .report-row .rcount{color:var(--muted);font-size:12px;}
+  .report-row .ramount{font-family:'IBM Plex Mono',monospace;}
+
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important;transition:none !important;} }
+</style>
+</head>
+<body>
+
+<div id="lock">
+  <div class="title">Docket</div>
+  <div class="sub" id="lockSub">Enter PIN</div>
+  <div id="pinDots"></div>
+  <div id="pinPad"></div>
+  <div id="lockError"></div>
+  <div id="setupNote" class="hidden">Choose a 4-digit PIN to protect this app. You'll enter it each time you open Docket.</div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <div class="brand">Docket</div>
+    <div class="tagline">Time &amp; billing ledger</div>
+    <nav>
+      <button class="tab active" data-tab="timer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Timer
+      </button>
+      <button class="tab" data-tab="projects">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>
+        Projects
+      </button>
+      <button class="tab" data-tab="report">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg>
+        Report
+      </button>
+    </nav>
+  </header>
+  <main id="main"></main>
+</div>
+
+<script>
+/* ---------- Storage ---------- */
+const LS = {
+  get(key, fallback){ try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } },
+  set(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+};
+
+const INCREMENTS = [
+  { id:"6min", label:"6 min (0.1 hr)", minutes:6 },
+  { id:"15min", label:"15 min (0.25 hr)", minutes:15 },
+  { id:"30min", label:"30 min (0.5 hr)", minutes:30 },
+];
+
+const DEFAULT_PROJECTS = [
+  { id:"p1", parentId:null, name:"Hughes Satellite Systems", description:"Chapter 11 — Valuation", status:"active", increment:"6min" },
+  { id:"p2", parentId:null, name:"Vi-Jon", description:"Bankruptcy advisory", status:"active", increment:"15min" },
+];
+
+let state = {
+  entries: LS.get("dk_entries", []),
+  projects: LS.get("dk_projects", DEFAULT_PROJECTS),
+  running: LS.get("dk_running", null),
+};
+
+function persist(){
+  LS.set("dk_entries", state.entries);
+  LS.set("dk_projects", state.projects);
+  LS.set("dk_running", state.running);
+}
+
+/* ---------- Helpers ---------- */
+function pad(n){ return n.toString().padStart(2,"0"); }
+function fmtHMS(s){ const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=Math.floor(s%60); return `${pad(h)}:${pad(m)}:${pad(sec)}`; }
+function fmtH(s){ return (s/3600).toFixed(2); }
+function roundToIncrement(seconds, incMinutes){ const inc=incMinutes*60; if(seconds<=0) return 0; return Math.ceil(seconds/inc)*inc; }
+function todayKey(d=new Date()){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function dayLabel(key){
+  const [y,m,d]=key.split("-").map(Number); const date=new Date(y,m-1,d);
+  const today=todayKey(), yest=todayKey(new Date(Date.now()-86400000));
+  if(key===today) return "Today";
+  if(key===yest) return "Yesterday";
+  return date.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
+}
+function projectById(id){ return state.projects.find(p=>p.id===id) || {name:"Unknown", increment:"15min"}; }
+function projectPath(id){
+  const p = projectById(id);
+  if(p.parentId){ const parent = projectById(p.parentId); return `${parent.name} / ${p.name}`; }
+  return p.name;
+}
+function incrementMinutes(projectId){
+  const p = projectById(projectId);
+  const inc = INCREMENTS.find(i=>i.id===p.increment) || INCREMENTS[1];
+  return inc.minutes;
+}
+function incLabel(id){ return (INCREMENTS.find(i=>i.id===id)||{}).label || id; }
+function esc(str){ const d=document.createElement("div"); d.textContent = str==null?"":str; return d.innerHTML; }
+function svg(name){
+  const icons = {
+    play:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>',
+    stop:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12"/></svg>',
+    trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+    chevronDown:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>',
+    chevronRight:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>',
+    plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>',
+    pencil:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+    archive:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M10 13h4"/></svg>',
+    restore:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="4"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M12 17v-4M10 15l2-2 2 2"/></svg>',
+    x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  };
+  return icons[name] || "";
+}
+
+/* ---------- Timer tick ---------- */
+let tickInterval = null;
+function startTicking(){
+  clearInterval(tickInterval);
+  tickInterval = setInterval(()=>{ if(state.running) renderTimerTick(); }, 1000);
+}
+
+/* ---------- Router ---------- */
+let currentTab = "timer";
+document.querySelectorAll(".tab").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    currentTab = btn.dataset.tab;
+    document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active", b===btn));
+    render();
+  });
+});
+
+function render(){
+  const main = document.getElementById("main");
+  if(currentTab === "timer") renderTimer(main);
+  else if(currentTab === "projects") renderProjects(main);
+  else renderReport(main);
+}
+
+/* ---------- Timer View ---------- */
+let timerNote = "";
+let showManual = false;
+let manualProject = null;
+let collapsedDays = {};
+
+function activeProjects(){ return state.projects.filter(p=>p.status==="active"); }
+
+function renderTimer(main){
+  const actives = activeProjects();
+  if(actives.length === 0){
+    main.innerHTML = `<div class="empty bordered">No active projects yet. Add one in the Projects tab to start logging time.</div>`;
+    return;
+  }
+  if(!manualProject) manualProject = actives[0].id;
+  const selectedProject = state.running ? state.running.projectId : (activeProjects().find(p=>p.id===selectedTimerProject) ? selectedTimerProject : actives[0].id);
+  selectedTimerProject = selectedProject;
+
+  const running = state.running;
+  const elapsed = running ? Math.floor((Date.now()-new Date(running.startedAt).getTime())/1000) : 0;
+
+  main.innerHTML = `
+    <div class="card">
+      <div class="timer-display ${running?'running':''}" id="timerDisplay">${fmtHMS(running?elapsed:0)}</div>
+      ${running ? `<div class="billing-note" id="billingNote">billing at ${fmtH(roundToIncrement(elapsed, incrementMinutes(running.projectId)))}h (${incrementMinutes(running.projectId)}-min increments)</div>` : ""}
+      <div class="field">
+        <label>Project</label>
+        <select id="projectSelect" ${running?'disabled':''}>
+          ${actives.map(p=>`<option value="${p.id}" ${p.id===selectedProject?'selected':''}>${esc(projectPath(p.id))}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label>Note (optional)</label>
+        <input id="noteInput" type="text" placeholder="What are you working on?" value="${esc(running ? running.note : timerNote)}" />
+      </div>
+      <div class="row" style="margin-top:12px;">
+        ${running
+          ? `<button class="btn-stop" id="stopBtn">${svg('stop')} Stop &amp; log</button>`
+          : `<button class="btn-primary" id="startBtn">${svg('play')} Start timer</button>`
+        }
+        <button class="btn-secondary" id="manualToggle">Log manually</button>
+      </div>
+      <div id="manualBox" class="manual-box ${showManual?'':'hidden'}">
+        <select id="manualProjectSelect">
+          ${actives.map(p=>`<option value="${p.id}" ${p.id===manualProject?'selected':''}>${esc(projectPath(p.id))}</option>`).join("")}
+        </select>
+        <div class="row">
+          <input id="manualHours" type="number" step="0.1" min="0" placeholder="Hours" />
+          <input id="manualNote" type="text" placeholder="Note (optional)" style="flex:1;" />
+          <button class="btn-gold" id="manualLogBtn">Log</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-strip">
+      <div class="label">Billed today</div>
+      <div class="value" id="todayTotal">${fmtH(todayTotalSeconds())}h</div>
+    </div>
+
+    <div id="ledger">${renderLedgerHTML()}</div>
+  `;
+
+  document.getElementById("projectSelect").addEventListener("change", e=>{ selectedTimerProject = e.target.value; });
+  document.getElementById("noteInput").addEventListener("input", e=>{
+    if(state.running){ state.running.note = e.target.value; persist(); }
+    else timerNote = e.target.value;
+  });
+  if(running){
+    document.getElementById("stopBtn").addEventListener("click", stopTimer);
+  } else {
+    document.getElementById("startBtn").addEventListener("click", startTimer);
+  }
+  document.getElementById("manualToggle").addEventListener("click", ()=>{ showManual = !showManual; renderTimer(main); });
+  if(showManual){
+    document.getElementById("manualProjectSelect").addEventListener("change", e=>{ manualProject = e.target.value; });
+    document.getElementById("manualLogBtn").addEventListener("click", addManualEntry);
+  }
+
+  attachLedgerHandlers();
+  startTicking();
+}
+
+let selectedTimerProject = null;
+
+function renderTimerTick(){
+  if(currentTab !== "timer" || !state.running) return;
+  const elapsed = Math.floor((Date.now()-new Date(state.running.startedAt).getTime())/1000);
+  const disp = document.getElementById("timerDisplay");
+  if(disp) disp.textContent = fmtHMS(elapsed);
+  const note = document.getElementById("billingNote");
+  if(note) note.textContent = `billing at ${fmtH(roundToIncrement(elapsed, incrementMinutes(state.running.projectId)))}h (${incrementMinutes(state.running.projectId)}-min increments)`;
+  const todayEl = document.getElementById("todayTotal");
+  if(todayEl) todayEl.textContent = `${fmtH(todayTotalSeconds())}h`;
+}
+
+function todayTotalSeconds(){
+  const today = todayKey();
+  let total = state.entries.filter(e=>e.date===today).reduce((s,e)=>s+e.billedSeconds,0);
+  if(state.running) total += roundToIncrement(Math.floor((Date.now()-new Date(state.running.startedAt).getTime())/1000), incrementMinutes(state.running.projectId));
+  return total;
+}
+
+function startTimer(){
+  if(!selectedTimerProject) return;
+  state.running = { projectId: selectedTimerProject, note: timerNote, startedAt: new Date().toISOString() };
+  persist();
+  renderTimer(document.getElementById("main"));
+}
+function stopTimer(){
+  if(!state.running) return;
+  const start = new Date(state.running.startedAt), end = new Date();
+  const rawSeconds = Math.max(1, Math.floor((end-start)/1000));
+  const inc = incrementMinutes(state.running.projectId);
+  const billedSeconds = roundToIncrement(rawSeconds, inc);
+  state.entries.unshift({
+    id: "e_"+Date.now(), projectId: state.running.projectId, note: state.running.note,
+    rawSeconds, billedSeconds, date: todayKey(start), startedAt: state.running.startedAt, endedAt: end.toISOString(),
+  });
+  state.running = null;
+  timerNote = "";
+  persist();
+  renderTimer(document.getElementById("main"));
+}
+function addManualEntry(){
+  const hrsInput = document.getElementById("manualHours");
+  const noteInput = document.getElementById("manualNote");
+  const hrs = parseFloat(hrsInput.value);
+  if(!hrs || hrs<=0 || !manualProject) return;
+  const rawSeconds = Math.round(hrs*3600);
+  const inc = incrementMinutes(manualProject);
+  const billedSeconds = roundToIncrement(rawSeconds, inc);
+  state.entries.unshift({
+    id:"e_"+Date.now(), projectId: manualProject, note: noteInput.value,
+    rawSeconds, billedSeconds, date: todayKey(), startedAt: new Date().toISOString(), endedAt: new Date().toISOString(), manual:true,
+  });
+  showManual = false;
+  persist();
+  renderTimer(document.getElementById("main"));
+}
+
+function renderLedgerHTML(){
+  const grouped = {};
+  state.entries.forEach(e=>{ (grouped[e.date] = grouped[e.date]||[]).push(e); });
+  const dayKeys = Object.keys(grouped).sort((a,b)=> a<b?1:-1);
+  if(dayKeys.length===0) return `<div class="empty" style="border-top:1px solid var(--rule);">No entries yet.</div>`;
+  return dayKeys.map(day=>{
+    const dayEntries = grouped[day].slice().sort((a,b)=> new Date(b.startedAt)-new Date(a.startedAt));
+    const daySeconds = dayEntries.reduce((s,e)=>s+e.billedSeconds,0);
+    const collapsed = !!collapsedDays[day];
+    return `
+      <div class="day-group">
+        <button class="day-header" data-day="${day}">
+          <span class="label">${collapsed?svg('chevronRight'):svg('chevronDown')} ${dayLabel(day)}</span>
+          <span class="total">${fmtH(daySeconds)}h</span>
+        </button>
+        ${collapsed ? "" : dayEntries.map(e=>`
+          <div class="entry-row">
+            <div style="min-width:0;">
+              <div class="name">${esc(projectPath(e.projectId))}</div>
+              ${e.note ? `<div class="note">${esc(e.note)}</div>` : ""}
+            </div>
+            <div class="right">
+              <span class="amount">${fmtH(e.billedSeconds)}h</span>
+              <button class="icon-btn" data-delete="${e.id}" aria-label="Delete entry">${svg('trash')}</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }).join("");
+}
+
+function attachLedgerHandlers(){
+  document.querySelectorAll(".day-header").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const day = btn.dataset.day;
+      collapsedDays[day] = !collapsedDays[day];
+      document.getElementById("ledger").innerHTML = renderLedgerHTML();
+      attachLedgerHandlers();
+    });
+  });
+  document.querySelectorAll("[data-delete]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.entries = state.entries.filter(e=>e.id!==btn.dataset.delete);
+      persist();
+      document.getElementById("ledger").innerHTML = renderLedgerHTML();
+      attachLedgerHandlers();
+      const todayEl = document.getElementById("todayTotal");
+      if(todayEl) todayEl.textContent = `${fmtH(todayTotalSeconds())}h`;
+    });
+  });
+}
+
+/* ---------- Projects View ---------- */
+let showForm = false;
+let editingId = null;
+let formState = { name:"", description:"", increment:"15min", parentId:"" };
+let showInactive = false;
+
+function renderProjects(main){
+  const topLevel = state.projects.filter(p=>!p.parentId);
+  const visibleTop = topLevel.filter(p=> showInactive || p.status==="active");
+  const subsOf = id => state.projects.filter(p=>p.parentId===id);
+
+  main.innerHTML = `
+    <div class="proj-toolbar">
+      <label><input type="checkbox" id="showInactive" ${showInactive?'checked':''}/> Show inactive</label>
+      <button class="btn-gold" id="newProjectBtn" style="display:flex;align-items:center;gap:6px;">${svg('plus')} New project</button>
+    </div>
+    <div id="formArea">${showForm ? renderFormHTML() : ""}</div>
+    ${visibleTop.length===0 ? `<div class="empty bordered">No projects yet.</div>` : ""}
+    ${visibleTop.map(p=>{
+      const subs = subsOf(p.id).filter(sp=> showInactive || sp.status==="active");
+      return `
+      <div class="proj-card ${p.status==='inactive'?'inactive':''}">
+        <div class="body">
+          <div class="top">
+            <div style="min-width:0;">
+              <div class="name">${esc(p.name)}</div>
+              ${p.description ? `<div class="desc">${esc(p.description)}</div>` : ""}
+              <div class="inc">${esc(incLabel(p.increment))}</div>
+            </div>
+            <div class="actions">
+              <button class="icon-btn" data-edit="${p.id}" aria-label="Edit">${svg('pencil')}</button>
+              <button class="icon-btn" data-toggle="${p.id}" aria-label="Toggle active">${p.status==='active'?svg('archive'):svg('restore')}</button>
+              <button class="icon-btn" data-remove="${p.id}" aria-label="Delete">${svg('trash')}</button>
+            </div>
+          </div>
+          <button class="subproj-btn" data-newsub="${p.id}">${svg('plus')} Sub-project</button>
+        </div>
+        ${subs.length>0 ? `<div class="sub-list">${subs.map(sp=>`
+          <div class="sub-row ${sp.status==='inactive'?'inactive':''}">
+            <div>
+              <div class="name">${esc(sp.name)}</div>
+              ${sp.description ? `<div class="desc">${esc(sp.description)}</div>` : ""}
+              <div class="inc">${esc(incLabel(sp.increment))}</div>
+            </div>
+            <div class="actions">
+              <button class="icon-btn" data-edit="${sp.id}" aria-label="Edit">${svg('pencil')}</button>
+              <button class="icon-btn" data-toggle="${sp.id}" aria-label="Toggle active">${sp.status==='active'?svg('archive'):svg('restore')}</button>
+              <button class="icon-btn" data-remove="${sp.id}" aria-label="Delete">${svg('trash')}</button>
+            </div>
+          </div>
+        `).join("")}</div>` : ""}
+      </div>
+    `;}).join("")}
+  `;
+
+  document.getElementById("showInactive").addEventListener("change", e=>{ showInactive = e.target.checked; renderProjects(main); });
+  document.getElementById("newProjectBtn").addEventListener("click", ()=>{ openNewForm(""); });
+  document.querySelectorAll("[data-newsub]").forEach(btn=> btn.addEventListener("click", ()=> openNewForm(btn.dataset.newsub)));
+  document.querySelectorAll("[data-edit]").forEach(btn=> btn.addEventListener("click", ()=> openEditForm(btn.dataset.edit)));
+  document.querySelectorAll("[data-toggle]").forEach(btn=> btn.addEventListener("click", ()=> toggleStatus(btn.dataset.toggle)));
+  document.querySelectorAll("[data-remove]").forEach(btn=> btn.addEventListener("click", ()=> removeProject(btn.dataset.remove)));
+
+  if(showForm) attachFormHandlers();
+}
+
+function renderFormHTML(){
+  const parentName = formState.parentId ? (state.projects.find(p=>p.id===formState.parentId)||{}).name : null;
+  return `
+    <div class="form-box">
+      <div class="form-head">
+        <div class="title">${editingId ? "Edit project" : parentName ? `New sub-project of ${esc(parentName)}` : "New project"}</div>
+        <button class="icon-btn" id="closeFormBtn">${svg('x')}</button>
+      </div>
+      <div class="field" style="margin-top:0;">
+        <input id="formName" type="text" placeholder="Project name" value="${esc(formState.name)}" />
+      </div>
+      <div class="field">
+        <textarea id="formDesc" rows="2" placeholder="Description (optional)">${esc(formState.description)}</textarea>
+      </div>
+      <div class="field">
+        <label>Billing increment</label>
+        <select id="formIncrement">
+          ${INCREMENTS.map(i=>`<option value="${i.id}" ${i.id===formState.increment?'selected':''}>${i.label}</option>`).join("")}
+        </select>
+      </div>
+      <button class="btn-dark" id="saveFormBtn">${editingId ? "Save changes" : "Create project"}</button>
+    </div>
+  `;
+}
+
+function attachFormHandlers(){
+  document.getElementById("closeFormBtn").addEventListener("click", ()=>{ showForm=false; renderProjects(document.getElementById("main")); });
+  document.getElementById("formName").addEventListener("input", e=> formState.name = e.target.value);
+  document.getElementById("formDesc").addEventListener("input", e=> formState.description = e.target.value);
+  document.getElementById("formIncrement").addEventListener("change", e=> formState.increment = e.target.value);
+  document.getElementById("saveFormBtn").addEventListener("click", saveProjectForm);
+}
+
+function openNewForm(parentId){
+  formState = { name:"", description:"", increment:"15min", parentId: parentId||"" };
+  editingId = null; showForm = true;
+  renderProjects(document.getElementById("main"));
+}
+function openEditForm(id){
+  const p = state.projects.find(p=>p.id===id);
+  formState = { name:p.name, description:p.description||"", increment:p.increment, parentId:p.parentId||"" };
+  editingId = id; showForm = true;
+  renderProjects(document.getElementById("main"));
+}
+function saveProjectForm(){
+  if(!formState.name.trim()) return;
+  if(editingId){
+    state.projects = state.projects.map(p=> p.id===editingId ? {...p, name:formState.name.trim(), description:formState.description.trim(), increment:formState.increment} : p);
+  } else {
+    state.projects.push({ id:"p_"+Date.now(), parentId: formState.parentId||null, name:formState.name.trim(), description:formState.description.trim(), status:"active", increment:formState.increment });
+  }
+  showForm = false;
+  persist();
+  renderProjects(document.getElementById("main"));
+}
+function toggleStatus(id){
+  state.projects = state.projects.map(p=> p.id===id ? {...p, status: p.status==="active"?"inactive":"active"} : p);
+  persist();
+  renderProjects(document.getElementById("main"));
+}
+function removeProject(id){
+  const hasEntries = state.entries.some(e=>e.projectId===id);
+  const hasChildren = state.projects.some(p=>p.parentId===id);
+  if(hasEntries || hasChildren){ toggleStatus(id); return; }
+  state.projects = state.projects.filter(p=>p.id!==id);
+  persist();
+  renderProjects(document.getElementById("main"));
+}
+
+/* ---------- Report View ---------- */
+let reportFrom = todayKey(new Date(Date.now()-7*86400000));
+let reportTo = todayKey();
+
+function renderReport(main){
+  const filtered = state.entries.filter(e=> e.date>=reportFrom && e.date<=reportTo);
+  const byProject = {};
+  filtered.forEach(e=>{
+    byProject[e.projectId] = byProject[e.projectId] || {raw:0, billed:0, count:0};
+    byProject[e.projectId].raw += e.rawSeconds||0;
+    byProject[e.projectId].billed += e.billedSeconds||0;
+    byProject[e.projectId].count += 1;
+  });
+  const totalBilled = Object.values(byProject).reduce((s,v)=>s+v.billed,0);
+
+  const topLevelIds = state.projects.filter(p=>!p.parentId).map(p=>p.id);
+  let rowsHTML = "";
+  let first = true;
+  topLevelIds.forEach(tid=>{
+    const top = state.projects.find(p=>p.id===tid);
+    const subIds = state.projects.filter(p=>p.parentId===tid).map(p=>p.id);
+    const relevantIds = [tid, ...subIds].filter(id=> byProject[id]);
+    if(relevantIds.length===0) return;
+    rowsHTML += `<div class="report-group ${first?'first':''}">${esc(top.name)}</div>`;
+    first = false;
+    relevantIds.forEach(id=>{
+      const p = state.projects.find(pp=>pp.id===id);
+      const v = byProject[id];
+      const name = id===tid ? "(direct)" : p.name;
+      rowsHTML += `
+        <div class="report-row">
+          <span class="rname ${name==='(direct)'?'muted':''}">${esc(name)}</span>
+          <span class="rright">
+            <span class="rcount">${v.count} ${v.count===1?'entry':'entries'}</span>
+            <span class="ramount">${fmtH(v.billed)}h</span>
+          </span>
+        </div>
+      `;
+    });
+  });
+
+  main.innerHTML = `
+    <div class="date-row">
+      <div class="field"><label>From</label><input type="date" id="fromInput" value="${reportFrom}" /></div>
+      <div class="field"><label>To</label><input type="date" id="toInput" value="${reportTo}" /></div>
+    </div>
+    <div class="report-card">
+      <div class="report-head">
+        <div class="range">${reportFrom} — ${reportTo}</div>
+        <div class="total">${fmtH(totalBilled)}h</div>
+      </div>
+      <div class="report-sub">${filtered.length} entries · billed hours reflect each project's rounding rule</div>
+      ${rowsHTML || `<div class="empty" style="padding:20px 0;">No entries in this range.</div>`}
+    </div>
+    <button class="btn-gold" id="exportBtn" style="width:100%;margin-top:14px;padding:11px 0;" ${filtered.length===0?'disabled':''}>Export CSV</button>
+  `;
+
+  document.getElementById("fromInput").addEventListener("change", e=>{ reportFrom = e.target.value; renderReport(main); });
+  document.getElementById("toInput").addEventListener("change", e=>{ reportTo = e.target.value; renderReport(main); });
+  document.getElementById("exportBtn").addEventListener("click", ()=> exportCsv(byProject, totalBilled));
+}
+
+function exportCsv(byProject, totalBilled){
+  let csv = "Project,Entries,Raw Hours,Billed Hours\n";
+  Object.entries(byProject).forEach(([pid,v])=>{
+    csv += `"${projectPath(pid)}",${v.count},${fmtH(v.raw)},${fmtH(v.billed)}\n`;
+  });
+  csv += `\nTotal,,,${fmtH(totalBilled)}\n`;
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `time-report_${reportFrom}_to_${reportTo}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- PIN Lock ---------- */
+const PIN_KEY = "dk_pin_hash";
+function simpleHash(str){
+  let h = 0;
+  for(let i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) | 0; }
+  return h.toString(36);
+}
+let pinEntry = "";
+let pinMode = LS.get(PIN_KEY, null) ? "unlock" : "setup";
+let pinConfirmStage = false;
+let firstPin = "";
+
+function renderPinPad(){
+  const pad = document.getElementById("pinPad");
+  const keys = ["1","2","3","4","5","6","7","8","9","","0","del"];
+  pad.innerHTML = keys.map(k=>{
+    if(k==="") return `<div></div>`;
+    if(k==="del") return `<button class="pinKey" id="pinDel" aria-label="Delete">⌫</button>`;
+    return `<button class="pinKey" data-key="${k}">${k}</button>`;
+  }).join("");
+  pad.querySelectorAll("[data-key]").forEach(btn=>{
+    btn.addEventListener("click", ()=> onPinKey(btn.dataset.key));
+  });
+  document.getElementById("pinDel").addEventListener("click", ()=>{
+    pinEntry = pinEntry.slice(0,-1);
+    renderPinDots();
+  });
+}
+function renderPinDots(){
+  const dots = document.getElementById("pinDots");
+  dots.innerHTML = [0,1,2,3].map(i=> `<div class="pinDot ${i<pinEntry.length?'filled':''}"></div>`).join("");
+}
+function setLockSub(){
+  const sub = document.getElementById("lockSub");
+  const note = document.getElementById("setupNote");
+  const err = document.getElementById("lockError");
+  err.textContent = "";
+  if(pinMode==="setup"){
+    sub.textContent = pinConfirmStage ? "Confirm PIN" : "Choose a PIN";
+    note.classList.toggle("hidden", pinConfirmStage);
+  } else {
+    sub.textContent = "Enter PIN";
+    note.classList.add("hidden");
+  }
+}
+function onPinKey(digit){
+  if(pinEntry.length>=4) return;
+  pinEntry += digit;
+  renderPinDots();
+  if(pinEntry.length===4){
+    setTimeout(()=> handlePinComplete(), 150);
+  }
+}
+function handlePinComplete(){
+  const err = document.getElementById("lockError");
+  if(pinMode==="setup"){
+    if(!pinConfirmStage){
+      firstPin = pinEntry;
+      pinEntry = "";
+      pinConfirmStage = true;
+      setLockSub();
+      renderPinDots();
+    } else {
+      if(pinEntry === firstPin){
+        LS.set(PIN_KEY, simpleHash(pinEntry));
+        unlockApp();
+      } else {
+        err.textContent = "PINs didn't match — try again.";
+        pinEntry = ""; firstPin=""; pinConfirmStage = false;
+        setLockSub();
+        renderPinDots();
+      }
+    }
+  } else {
+    const saved = LS.get(PIN_KEY, null);
+    if(simpleHash(pinEntry) === saved){
+      unlockApp();
+    } else {
+      err.textContent = "Incorrect PIN.";
+      pinEntry = "";
+      renderPinDots();
+    }
+  }
+}
+function unlockApp(){
+  document.getElementById("lock").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  render();
+}
+
+/* ---------- Init ---------- */
+setLockSub();
+renderPinDots();
+renderPinPad();
+
+/* Register service worker */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
