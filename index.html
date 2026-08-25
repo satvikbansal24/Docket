@@ -46,21 +46,6 @@
   #app{max-width:640px;margin:0 auto;padding-bottom:60px;min-height:100vh;}
   .hidden{display:none !important;}
 
-  /* Lock screen — deliberately fixed dark styling, independent of the app theme setting */
-  #lock{position:fixed;inset:0;background:#1C2333;display:flex;align-items:center;justify-content:center;
-    flex-direction:column;z-index:100;padding:24px;}
-  #lock .title{font-family:'Source Serif 4',serif;color:#F7F3EC;font-size:22px;font-weight:700;margin-bottom:4px;}
-  #lock .sub{color:#a39c8c;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:28px;}
-  #pinDots{display:flex;gap:14px;margin-bottom:26px;}
-  .pinDot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--gold);background:transparent;}
-  .pinDot.filled{background:var(--gold);}
-  #pinPad{display:grid;grid-template-columns:repeat(3,64px);gap:14px;}
-  .pinKey{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);
-    color:#F7F3EC;font-size:20px;font-weight:500;display:flex;align-items:center;justify-content:center;}
-  .pinKey:active{background:rgba(255,255,255,0.14);}
-  #lockError{color:#D98B7A;font-size:13px;margin-top:14px;min-height:16px;}
-  #setupNote{color:#a39c8c;font-size:12.5px;text-align:center;max-width:280px;margin-top:18px;line-height:1.5;}
-
   /* Header */
   header{border-bottom:1px solid var(--rule);padding:calc(24px + env(safe-area-inset-top)) 20px 0;}
   .header-top{display:flex;justify-content:space-between;align-items:center;}
@@ -208,16 +193,7 @@
 </head>
 <body>
 
-<div id="lock">
-  <div class="title">Docket</div>
-  <div class="sub" id="lockSub">Enter PIN</div>
-  <div id="pinDots"></div>
-  <div id="pinPad"></div>
-  <div id="lockError"></div>
-  <div id="setupNote" class="hidden">Choose a 4-digit PIN to protect this app. You'll enter it each time you open Docket.</div>
-</div>
-
-<div id="app" class="hidden">
+<div id="app">
   <header>
     <div class="header-top">
       <div>
@@ -1108,107 +1084,6 @@ function exportPdf(byProject, totalBilled, filteredEntries){
   doc.save(`docket-report_${reportFrom}_to_${reportTo}.pdf`);
 }
 
-/* ---------- PIN Lock ---------- */
-const PIN_KEY = "dk_pin_hash";
-function simpleHash(str){
-  let h = 0;
-  for(let i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) | 0; }
-  return h.toString(36);
-}
-let pinEntry = "";
-let pinMode = LS.get(PIN_KEY, null) ? "unlock" : "setup";
-let pinConfirmStage = false;
-let firstPin = "";
-
-function renderPinPad(){
-  const pad = document.getElementById("pinPad");
-  const keys = ["1","2","3","4","5","6","7","8","9","","0","del"];
-  pad.innerHTML = keys.map(k=>{
-    if(k==="") return `<div></div>`;
-    if(k==="del") return `<button class="pinKey" id="pinDel" aria-label="Delete">⌫</button>`;
-    return `<button class="pinKey" data-key="${k}">${k}</button>`;
-  }).join("");
-  pad.querySelectorAll("[data-key]").forEach(btn=>{
-    btn.addEventListener("click", ()=> onPinKey(btn.dataset.key));
-  });
-  document.getElementById("pinDel").addEventListener("click", ()=>{
-    pinEntry = pinEntry.slice(0,-1);
-    renderPinDots();
-  });
-}
-function renderPinDots(){
-  const dots = document.getElementById("pinDots");
-  dots.innerHTML = [0,1,2,3].map(i=> `<div class="pinDot ${i<pinEntry.length?'filled':''}"></div>`).join("");
-}
-function setLockSub(){
-  const sub = document.getElementById("lockSub");
-  const note = document.getElementById("setupNote");
-  const err = document.getElementById("lockError");
-  err.textContent = "";
-  if(pinMode==="setup"){
-    sub.textContent = pinConfirmStage ? "Confirm PIN" : "Choose a PIN";
-    note.classList.toggle("hidden", pinConfirmStage);
-  } else {
-    sub.textContent = "Enter PIN";
-    note.classList.add("hidden");
-  }
-}
-function onPinKey(digit){
-  if(pinEntry.length>=4) return;
-  pinEntry += digit;
-  renderPinDots();
-  if(pinEntry.length===4){
-    setTimeout(()=> handlePinComplete(), 150);
-  }
-}
-function handlePinComplete(){
-  const err = document.getElementById("lockError");
-  if(pinMode==="setup"){
-    if(!pinConfirmStage){
-      firstPin = pinEntry;
-      pinEntry = "";
-      pinConfirmStage = true;
-      setLockSub();
-      renderPinDots();
-    } else {
-      if(pinEntry === firstPin){
-        LS.set(PIN_KEY, simpleHash(pinEntry));
-        unlockApp();
-      } else {
-        err.textContent = "PINs didn't match — try again.";
-        pinEntry = ""; firstPin=""; pinConfirmStage = false;
-        setLockSub();
-        renderPinDots();
-      }
-    }
-  } else {
-    const saved = LS.get(PIN_KEY, null);
-    if(simpleHash(pinEntry) === saved){
-      unlockApp();
-    } else {
-      err.textContent = "Incorrect PIN.";
-      pinEntry = "";
-      renderPinDots();
-    }
-  }
-}
-function unlockApp(){
-  document.getElementById("lock").classList.add("hidden");
-  document.getElementById("app").classList.remove("hidden");
-  render();
-}
-function lockApp(){
-  closeSettings();
-  document.getElementById("app").classList.add("hidden");
-  document.getElementById("lock").classList.remove("hidden");
-  pinEntry = "";
-  pinConfirmStage = false;
-  firstPin = "";
-  pinMode = LS.get(PIN_KEY, null) ? "unlock" : "setup";
-  setLockSub();
-  renderPinDots();
-}
-
 /* ---------- Settings ---------- */
 function openSettings(){
   document.getElementById("settingsOverlay").classList.remove("hidden");
@@ -1233,23 +1108,15 @@ function renderSettingsPanel(){
         <button class="theme-opt ${theme==='system'?'active':''}" data-theme-opt="system">System</button>
       </div>
     </div>
-    <div class="settings-section">
-      <div class="settings-label">Security</div>
-      <button class="btn-secondary" id="lockNowBtn" style="width:100%;">Lock now</button>
-      <div class="settings-note">Locking takes you back to the PIN screen right away, without waiting for the app to close.</div>
-    </div>
   `;
   document.getElementById("settingsCloseBtn").addEventListener("click", closeSettings);
   panel.querySelectorAll("[data-theme-opt]").forEach(btn=>{
     btn.addEventListener("click", ()=>{ setTheme(btn.dataset.themeOpt); renderSettingsPanel(); });
   });
-  document.getElementById("lockNowBtn").addEventListener("click", lockApp);
 }
 
 /* ---------- Init ---------- */
-setLockSub();
-renderPinDots();
-renderPinPad();
+render();
 document.getElementById("settingsBtn").innerHTML = svg('gear');
 document.getElementById("settingsBtn").addEventListener("click", openSettings);
 document.getElementById("settingsBackdrop").addEventListener("click", closeSettings);
